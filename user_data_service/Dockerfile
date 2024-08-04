@@ -2,7 +2,7 @@
 FROM python:3.12-slim
 
 # Set the working directory in the container
-WORKDIR /linebot_service
+WORKDIR /user_data_service
 
 # Copy the requirements file into the container
 COPY requirements.txt .
@@ -17,8 +17,7 @@ COPY . .
 EXPOSE 5000
 
 # Define environment variables for sensitive information
-ENV CHANNEL_ACCESS_TOKEN="OlBB4oUUD+JGn0seVaoKPMuxox9ek86n+B8YonnWulLgdN5QxNCKkRXPBGBbFSOmVTzT7T80rk0fSE/RT/wY/tHoytoWyXAMNrisejLRCLLfPrkqTac+KQz0TCmb5bbocY+W5jdmwVVh9yzV/jrDiAdB04t89/1O/w1cDnyilFU="
-ENV CHANNEL_SECRET="35b7ab925ad8a5aaada8ed838f38f84c"
+
 
 # Run the application
 CMD ["python", "app.py"]
