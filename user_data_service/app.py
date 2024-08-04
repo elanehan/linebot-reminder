@@ -1,5 +1,8 @@
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
 
 # Load the service account credentials
 def get_gspread_client():
@@ -13,30 +16,40 @@ def get_sheet(client, sheet_name="Linebot"):
     return client.open(sheet_name).sheet1
 
 # Function to get user data
-def get_user_data(sheet, user_id):
+@app.route('/user/<user_id>', methods=['GET'])
+def get_user_data(user_id):
+    client = get_gspread_client()
+    sheet = get_sheet(client)
     data = sheet.get_all_records()
     for row in data:
         if row['user_id'] == user_id:
-            return row
-    return None
+            return jsonify(row)
+    return jsonify({'message': 'User not found'}), 404
 
 # Function to update user's title
-def update_user_title(sheet, user_id, title=None):
+@app.route('/user/<user_id>/title', methods=['PUT'])
+def update_user_title(user_id, title=None):
+    client = get_gspread_client()
+    sheet = get_sheet(client)
     data = sheet.get_all_records()
     row_index = 2  # Starting from 2 because get_all_records() skips the header
     for row in data:
         if row['user_id'] == user_id:
             if title:
                 sheet.update_cell(row_index, 2, title)  # Update title
-            return
+            return jsonify({'message': 'User found, title updated'}), 200
         row_index += 1
     
     # If user_id not found, append a new row
     new_row = [user_id, title, 'Asia/Taipei']
     sheet.append_row(new_row)
+    return jsonify({'message': 'User not found, new row added'}), 201
 
 # Function to update user's timezone
-def update_user_timezone(sheet, user_id, timezone=None):
+@app.route('/user/<user_id>/timezone', methods=['PUT'])
+def update_user_timezone(user_id, timezone=None, title=None):
+    client = get_gspread_client()
+    sheet = get_sheet(client)
     timezone_dict = {"台灣": "Asia/Taipei", "美東": "America/New_York", "美西": "America/Los_Angeles", "日本": "Asia/Tokyo"}
     data = sheet.get_all_records()
     row_index = 2  # Starting from 2 because get_all_records() skips the header
@@ -45,26 +58,14 @@ def update_user_timezone(sheet, user_id, timezone=None):
             if timezone:
                 timezone = timezone_dict.get(timezone, timezone)
                 sheet.update_cell(row_index, 3, timezone)  # Update timezone
-            return
+            return jsonify({'message': 'User found, timezone updated'}), 200
         row_index += 1
     
     # If user_id not found, append a new row
     timezone = timezone_dict.get(timezone, timezone)
-    new_row = [user_id, '你', timezone]
+    new_row = [user_id, title, timezone]
     sheet.append_row(new_row)
+    return jsonify({'message': 'User not found, new row added'}), 201
 
-# Example usage within this module (for testing)
-if __name__ == "__main__":
-    client = get_gspread_client()
-    sheet = get_sheet(client)
-    user_id = "U1234567890"
-    title = "Babe"
-    timezone = "日本"
-    
-    # Get user data
-    user_data = get_user_data(sheet, user_id)
-    print(user_data)
-    
-    # Update user data
-    update_user_title(sheet, user_id, title)
-    update_user_timezone(sheet, user_id, timezone)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
