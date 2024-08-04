@@ -262,16 +262,16 @@ def parse_text(text, zone='Asia/Taipei', default_subject='我'):
     else:
         return None, None, None
 
-@app.route('/nlp_service', methods=['POST'])
+@app.route('/process', methods=['POST'])
 def nlp_service():
     data = request.json
     string = data.get('string', '')
     zone = data.get('zone', 'Asia/Taipei')
-    default_subject = data.get('default_subject', '我')
+    default_subject = data.get('default_subject', '')
     subj, cron_expression, task = parse_text(string, zone, default_subject)
     if cron_expression == ' ':
         return jsonify({'error': 'No time expression found'})
     return jsonify({'subject': subj, 'time_expressions': cron_expression, 'task': task})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000)
