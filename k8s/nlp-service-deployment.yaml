@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nlp-service-deployment
+  labels:
+    app: nlp-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nlp-service
+  template:
+    metadata:
+      labels:
+        app: nlp-service
+    spec:
+      containers:
+      - name: nlp-service
+        image: gcr.io/linebot-reminder-431422/nlp_service:latest
+        ports:
+        - containerPort: 5000
+

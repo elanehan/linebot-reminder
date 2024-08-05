@@ -16,9 +16,5 @@ COPY . .
 # Make port 5000 available to the world outside this container
 EXPOSE 5000
 
-# Define environment variables for sensitive information
-ENV CHANNEL_ACCESS_TOKEN="OlBB4oUUD+JGn0seVaoKPMuxox9ek86n+B8YonnWulLgdN5QxNCKkRXPBGBbFSOmVTzT7T80rk0fSE/RT/wY/tHoytoWyXAMNrisejLRCLLfPrkqTac+KQz0TCmb5bbocY+W5jdmwVVh9yzV/jrDiAdB04t89/1O/w1cDnyilFU="
-ENV CHANNEL_SECRET="35b7ab925ad8a5aaada8ed838f38f84c"
-
 # Run the application
 CMD ["python", "app.py"]

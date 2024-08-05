@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: linebot-service-deployment
+  labels:
+    app: linebot
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: linebot
+  template:
+    metadata:
+      labels:
+        app: linebot
+    spec:
+      containers:
+      - name: linebot-service
+        image: gcr.io/linebot-reminder-431422/linebot_service:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: CHANNEL_ACCESS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: line-bot-secrets
+              key: CHANNEL_ACCESS_TOKEN
+        - name: CHANNEL_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: line-bot-secrets
+              key: CHANNEL_SECRET
+
