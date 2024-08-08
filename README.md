@@ -17,7 +17,7 @@ To get started with the LineReminderAssistant, follow the instructions below to 
 - Python 3.9
 - LINE Developer Account
 - Required Python libraries (listed in `requirements.txt`)
-- GCP
+- GCP (Google Cloud Platform)
 
 ### Installation
 
