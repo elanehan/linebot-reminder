@@ -1,6 +1,6 @@
 # LineReminderAssistant: A ChatBot for Tasks Reminder
 
-This project is a Linebot application that leverages Natural Language Processing (NLP) to provide reminder service through chat based on users' requests. The bot is designed to understand and process natural language queries, offering a more humanized reminder for users on the LINE messaging platform.
+This project is a Linebot application that leverages Natural Language Processing (NLP) to provide reminder service through chat based on users' requests. The bot is designed to understand and process Mandarin time-related queries, offering a more humanized reminder for users on the LINE messaging platform.
 
 ## Features
 
