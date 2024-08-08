@@ -1,29 +1,27 @@
-from flask import Flask, request, jsonify
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 
-app = Flask(__name__)
 
 # dict for chinese time and number
 time_dict = {'零': 0, '一': 1, '二': 2, '兩': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10}
-week_dict = {'一': '1', '二': '2', '三': '3', '四': '4', '五': '5', '六': '6', '日': '7', '天': '7'}
+week_dict = {'一': '0', '二': '1', '三': '2', '四': '3', '五': '4', '六': '5', '日': '6', '天': '6'}
 am_pm_dict = {'早上': 'am', '上午': 'am', '中午': 'pm', '下午': 'pm', '晚上': 'pm', '凌晨': 'am', '半夜': 'am', 'AM': 'am', 'PM': 'pm'}
 
 date_pattern = r'(\d{1,2})/(\d{1,2})'
 hour_min_pattern = [
-    (r'(這(?:週|禮拜|星期)([一二三四五六日天])|今天|明天|後天|大後天)?\s*(am|pm)?\s*(\d{1,2}):(\d{2})\s*(am|pm)?', 'datetime'),  # 今天下午 3:15
-    (r'(這(?:週|禮拜|星期)([一二三四五六日天])|今天|明天|後天|大後天)?\s*(\d{1,2})\s*(am|pm)', 'time'),  # 明天 3 pm
-    (r'(這(?:週|禮拜|星期)([一二三四五六日天])|今天|明天|後天|大後天)?(am|pm)?\s*(\d{1,2})點半', 'mix_half_time'),  # 大後天 3點半
-    (r'(這(?:週|禮拜|星期)([一二三四五六日天])|今天|明天|後天|大後天)?(am|pm)?\s*(\d{1,2})點((\d{2})分)?', 'mix_time'),  # 後天 3點15分, 3點
-    (r'(這(?:週|禮拜|星期)([一二三四五六日天])|今天|明天|後天|大後天)?(am|pm)?([零一二兩三四五六七八九十]+)點半', 'chinese_half_time'),  # 這禮拜二三點半
-    (r'(這(?:週|禮拜|星期)([一二三四五六日天])|今天|明天|後天|大後天)?\s*(am|pm)?\s*([零一二兩三四五六七八九十]+)點\s*(([零一二三四五六七八九十]+)分)?', 'chinese_time'),  # 這週五三點(十五分)
-    (r'(\d{1,2})(分鐘|小時|天|日)後', 'mix_relative_time'),  # 3小時後
-    (r'([零一二兩三四五六七八九十]+)(分鐘|小時|天|日)後', 'chinese_relative_time'),  # 三十分鐘後
+    (r'((?:這週|這禮拜|這星期|下週|下禮拜|下星期|每週|每個禮拜|每星期)([一二三四五六日天])|今天|明天|後天|大後天)?\s*(am|pm)?\s*(\d{1,2}):(\d{2})\s*(am|pm)?', 'datetime'),  # 今天下午 3:15
+    (r'((?:這週|這禮拜|這星期|下週|下禮拜|下星期|每週|每個禮拜|每星期)([一二三四五六日天])|今天|明天|後天|大後天)?\s*(\d{1,2})\s*(am|pm)', 'time'),  # 明天 3 pm
+    (r'((?:這週|這禮拜|這星期|下週|下禮拜|下星期|每週|每個禮拜|每星期)([一二三四五六日天])|今天|明天|後天|大後天)?(am|pm)?\s*(\d{1,2})點半', 'mix_half_time'),  # 大後天 3點半
+    (r'((?:這週|這禮拜|這星期|下週|下禮拜|下星期|每週|每個禮拜|每星期)([一二三四五六日天])|今天|明天|後天|大後天)?(am|pm)?\s*(\d{1,2})點((\d{2})分)?', 'mix_time'),  # 後天 3點15分, 3點
+    (r'((?:這週|這禮拜|這星期|下週|下禮拜|下星期|每週|每個禮拜|每星期)([一二三四五六日天])|今天|明天|後天|大後天)?(am|pm)?([零一二兩三四五六七八九十]+)點半', 'chinese_half_time'),  # 這禮拜二三點半
+    (r'((?:這週|這禮拜|這星期|下週|下禮拜|下星期|每週|每個禮拜|每星期)([一二三四五六日天])|今天|明天|後天|大後天)?\s*(am|pm)?\s*([零一二兩三四五六七八九十]+)點\s*(([零一二三四五六七八九十]+)分)?', 'chinese_time'),  # 這週五三點(十五分)
+    (r'(\d{1,2})個*(分鐘|小時|天|日)後', 'mix_relative_time'),  # 3小時後
+    (r'([零一二兩三四五六七八九十]+)個*(秒|分鐘|小時|天|日)後', 'chinese_relative_time'),  # 三十分鐘後
 ]
 
 # process day
-def process_day(day):
+def process_day(day, weekday, now_weekday):
     addday = 0
     if day == '明天':
         addday = 1
@@ -31,6 +29,16 @@ def process_day(day):
         addday = 2
     elif day == '大後天':
         addday = 3
+    elif day.startswith('這星期') or day.startswith('這週') or day.startswith('這個禮拜'):
+        addday = int(week_dict[weekday]) - now_weekday
+    elif day.startswith('下星期') or day.startswith('下週') or day.startswith('下個禮拜'):
+        if int(week_dict[weekday]) < now_weekday:
+            addday = 7 - now_weekday + int(week_dict[weekday])
+        else:
+            addday = 7 + int(week_dict[weekday]) - now_weekday
+    elif day.startswith('每星期') or day.startswith('每週') or day.startswith('每個禮拜'):
+        addday = -1
+    #print(addday)
     return addday
 
 def chinese_to_number(chinese_time):
@@ -76,202 +84,224 @@ def time_overflow_check(minute, hour, day, month):
     return str(minute), str(hour), str(day), str(month)
 
 
-# extract subject, time and task from string
-def parse_text(text, zone='Asia/Taipei', default_subject='我'):
+# Extract subject, RFC3339 Format time, task from string
+def parse_text(text, zone='America/New_York'):
     # current time
-    now = datetime.now(pytz.timezone(zone))
+    time = datetime.now(pytz.timezone(zone))
 
-    # time expression array for cron
-    time_expression = [' '] * 9
-    time_expression[0] = str(now.minute)
-    time_expression[2] = str(now.hour)
-    time_expression[4] = str(now.day)
-    time_expression[6] = str(now.month)
-    time_expression[8] = '*'
-    #print(''.join(time_expression))
-    time_end_idx = 0
+    time_end_idx = -1 # for task extraction
+    rep = False
+    week = -1 # for cron expression
     
     for key in am_pm_dict.keys():
         text = text.replace(key, am_pm_dict[key])
+    text = text.replace('：', ':')
     date_match = re.search(date_pattern, text)
     if date_match:
-        day, month = date_match.groups()
-        time_expression[4] = day
-        time_expression[6] = month
+        month, dday = date_match.groups()
+        time = time.replace(day=int(dday), month=int(month))
         time_end_idx = date_match.end()
     #print(text)
     for pattern, pattern_type in hour_min_pattern:
         match = re.search(pattern, text)
         if match:
             groups = match.groups()
+            #print(groups)
             time_end_idx = max(time_end_idx, match.end())
             if pattern_type == 'datetime':
-                print(groups)
                 day, weekday, c_ap, hour, minute, ap = groups
                 if weekday:
-                    time_expression[8] = week_dict[weekday]
-                    time_expression[4] = '*'
-                    time_expression[6] = '*'
-                else:
-                    time_expression[4] = str(int(time_expression[4]) + process_day(day))
+                    if process_day(day, weekday, time.weekday()) > -1:
+                        time = time + timedelta(days=process_day(day, weekday, time.weekday()))
+                    else:
+                        rep = True
+                        week = int(week_dict[weekday])+1
+                        if week == 7: week = 0
                 if c_ap == 'am' or ap == 'am':
-                    if int(hour) == 12: time_expression[2] = '0'
-                    else: time_expression[2] = hour
+                    if int(hour) == 12: time = time.replace(hour=0)
+                    else: time = time.replace(hour=int(hour))
                 elif c_ap == 'pm' or ap == 'pm':
-                    if int(hour) == 12: time_expression[2] = hour
-                    else: time_expression[2] = str(int(hour) + 12)
-                else: time_expression[2] = hour
-                time_expression[0] = minute
+                    if int(hour) == 12: time = time.replace(hour=int(hour))
+                    else: time = time.replace(hour=int(hour) + 12)
+                else: time = time.replace(hour=int(hour))
+                time = time.replace(minute=int(minute))
+                time = time.replace(second=0)
+
             elif pattern_type == 'time':
                 day, weekday, hour, ap = groups
                 if weekday:
-                    time_expression[8] = week_dict[weekday]
-                    time_expression[4] = '*'
-                    time_expression[6] = '*'
-                else:
-                    time_expression[4] = str(int(time_expression[4]) + process_day(day))
+                    if process_day(day, weekday, time.weekday()) > -1:
+                        time = time + timedelta(days=process_day(day, weekday, time.weekday()))
+                    else:
+                        rep = True
+                        week = int(week_dict[weekday])+1
+                        if week == 7: week = 0
                 if ap == 'am':
-                    if int(hour) == 12: time_expression[2] = '0'
-                    else: time_expression[2] = hour
+                    if int(hour) == 12: time = time.replace(hour=0)
+                    else: time = time.replace(hour=int(hour))
                 elif ap == 'pm':
-                    if int(hour) == 12: time_expression[2] = hour
-                    else: time_expression[2] = str(int(hour) + 12)
-                else: time_expression[2] = hour
-                time_expression[0] = '0'
+                    if int(hour) == 12: time = time.replace(hour=int(hour))
+                    else: time = time.replace(hour=int(hour) + 12)
+                else: time = time.replace(hour=int(hour))
+                time = time.replace(minute=0)
+                time = time.replace(second=0)
                 #print('0')
             elif pattern_type == 'mix_half_time':
                 day, weekday, cap, hour = groups
                 if weekday:
-                    time_expression[8] = week_dict[weekday]
-                    time_expression[4] = '*'
-                    time_expression[6] = '*'
-                else:
-                    time_expression[4] = str(int(time_expression[4]) + process_day(day))
+                    if process_day(day, weekday, time.weekday()) > -1:
+                        time = time + timedelta(days=process_day(day, weekday, time.weekday()))
+                    else:
+                        rep = True
+                        week = int(week_dict[weekday])+1
+                        if week == 7: week = 0
                 if cap == 'am' or cap == 'pm':
                     if cap == 'am':
-                        if int(hour) == 12: time_expression[2] = '0'
-                        else: time_expression[2] = hour
+                        if int(hour) == 12: time = time.replace(hour=0)
+                        else: time = time.replace(hour=int(hour))
                     elif cap == 'pm':
-                        if int(hour) == 12: time_expression[2] = hour
-                        else: time_expression[2] = str(int(hour) + 12)
-                else: time_expression[2] = hour
-                time_expression[0] = '30'
+                        if int(hour) == 12: time = time.replace(hour=int(hour))
+                        else: time = time.replace(hour=int(hour) + 12)
+                else: time = time.replace(hour=int(hour))
+                time = time.replace(minute=30)
+                time = time.replace(second=0)
                 #print('2')
             elif pattern_type == 'mix_time':
                 day, weekday, cap, hour, is_min, minute = groups
                 if weekday:
-                    time_expression[8] = week_dict[weekday]
-                    time_expression[4] = '*'
-                    time_expression[6] = '*'
-                else:
-                    time_expression[4] = str(int(time_expression[4]) + process_day(day))
+                    if process_day(day, weekday, time.weekday()) > -1:
+                        time = time + timedelta(days=process_day(day, weekday, time.weekday()))
+                    else:
+                        rep = True
+                        week = int(week_dict[weekday])+1
+                        if week == 7: week = 0
                 if cap == 'am' or cap == 'pm':
                     if cap == 'am':
-                        if int(hour) == 12: time_expression[2] = '0'
-                        else: time_expression[2] = hour
+                        if int(hour) == 12: time = time.replace(hour=0)
+                        else: time = time.replace(hour=int(hour))
                     elif cap == 'pm':
-                        if int(hour) == 12: time_expression[2] = hour
-                        else: time_expression[2] = str(int(hour) + 12)
-                else: time_expression[2] = hour
+                        if int(hour) == 12: time = time.replace(hour=int(hour))
+                        else: time = time.replace(hour=int(hour) + 12)
+                else: time = time.replace(hour=int(hour))
                 if is_min:
-                    time_expression[0] = minute
+                    time = time.replace(minute=int(minute))
                 else:
-                    time_expression[0] = '0'
+                    time = time.replace(minute=0)
+                time = time.replace(second=0)
                 #print('1')
             elif pattern_type == 'chinese_half_time':
                 day, weekday, cap, hour = groups
                 if weekday:
-                    time_expression[8] = week_dict[weekday]
-                    time_expression[4] = '*'
-                    time_expression[6] = '*'
-                else:
-                    time_expression[4] = str(int(time_expression[4]) + process_day(day))
+                    if process_day(day, weekday, time.weekday()) > -1:
+                        time = time + timedelta(days=process_day(day, weekday, time.weekday()))
+                    else:
+                        rep = True
+                        week = int(week_dict[weekday])+1
+                        if week == 7: week = 0
                 hour = chinese_to_number(hour)
                 if cap == 'am' or cap == 'pm':
                     if cap == 'am':
-                        if hour == 12: time_expression[2] = '0'
-                        else: time_expression[2] = str(hour)
+                        if int(hour) == 12: time = time.replace(hour=0)
+                        else: time = time.replace(hour=int(hour))
                     elif cap == 'pm':
-                        if hour == 12: time_expression[2] = str(hour)
-                        else: time_expression[2] = str(hour + 12)
-                else: time_expression[2] = str(hour)
-                time_expression[0] = '30'
+                        if int(hour) == 12: time = time.replace(hour=int(hour))
+                        else: time = time.replace(hour=int(hour) + 12)
+                else: time = time.replace(hour=int(hour))
+                time = time.replace(minute=30)
+                time = time.replace(second=0)
             elif pattern_type == 'chinese_time':
                 day, weekday, cap, hour, is_min, minute = groups
+                print(groups)
                 if weekday:
-                    time_expression[8] = week_dict[weekday]
-                    time_expression[4] = '*'
-                    time_expression[6] = '*'
-                else:
-                    time_expression[4] = str(int(time_expression[4]) + process_day(day))
+                    if process_day(day, weekday, time.weekday()) > -1:
+                        time = time + timedelta(days=process_day(day, weekday, time.weekday()))
+                    else:
+                        rep = True
+                        week = int(week_dict[weekday])+1
+                        if week == 7: week = 0
                 hour = chinese_to_number(hour)
                 if cap == 'am' or cap == 'pm':
                     if cap == 'am':
-                        if hour == 12: time_expression[2] = '0'
-                        else: time_expression[2] = str(hour)
+                        if int(hour) == 12: time = time.replace(hour=0)
+                        else: time = time.replace(hour=int(hour))
                     elif cap == 'pm':
-                        if hour == 12: time_expression[2] = str(hour)
-                        else: time_expression[2] = str(hour + 12)
-                else: time_expression[2] = str(hour)
+                        if int(hour) == 12: time = time.replace(hour=int(hour))
+                        else: time = time.replace(hour=int(hour) + 12)
+                else: time = time.replace(hour=int(hour))
                 if is_min:
                     minute = chinese_to_number(minute)
-                    time_expression[0] = str(minute)
-                else: time_expression[0] = '0'
+                    time = time.replace(minute=int(minute))
+                else: time = time.replace(minute=0)
+                time = time.replace(second=0)
                 #print('3')
             elif pattern_type == 'mix_relative_time':
                 duration, unit = groups
                 duration = int(duration)
                 if unit == '小時':
-                    time_expression[2] = str(int(time_expression[2]) + duration)
+                    time = time + timedelta(hours=duration)
                 elif unit == '分鐘':
-                    time_expression[0] = str(int(time_expression[0]) + duration)
+                    time = time + timedelta(minutes=duration)
                 elif unit == '天' or unit == '日':
-                    time_expression[4] = str(int(time_expression[4]) + duration)
+                    time = time + timedelta(days=duration)
             elif pattern_type == 'chinese_relative_time':
                 #print('10')
                 duration, unit = groups
                 duration = chinese_to_number(duration)
                 if unit == '小時':
-                    time_expression[2] = str(int(time_expression[2]) + duration)
+                    time = time + timedelta(hours=duration)
                 elif unit == '分鐘':
-                    time_expression[0] = str(int(time_expression[0]) + duration)
+                    time = time + timedelta(minutes=duration)
                 elif unit == '天' or unit == '日':
-                    time_expression[4] = str(int(time_expression[4]) + duration)
-
-            # time overflow check
-            mi, hr, dd, mo = time_overflow_check(time_expression[0], time_expression[2], time_expression[4], time_expression[6])
-            time_expression[0], time_expression[2], time_expression[4], time_expression[6] = mi, hr, dd, mo
+                    time = time + timedelta(days=duration)
             
             break
-    tt = ''.join(time_expression)
+    if rep:
+        tt = [' '] * 9
+        tt[0] = str(time.minute)
+        tt[2] = str(time.hour)
+        tt[4] = '*'
+        tt[6] = '*'
+        tt[8] = str(week)
+        time_expression = ''.join(tt)
+    else:
+        time_expression = ''.join([str(time.minute), ' ', str(time.hour), ' ', str(time.day), ' ', str(time.month), ' ', '*'])
+
+    # extract subject
+    subject_match = re.search(r'@[^ ，]+', text)  # Match text starting with "＠" and ending before space/comma
+    #print(text)
+    #print(subject_match)
+    
+    if subject_match:
+        subject = subject_match.group(0)
+        #print(subject)
+    else:
+        # If no subject is found or subject is "我", use default subject
+        subject = '你'
 
     # extract task
     task = text[time_end_idx:].strip()
     task = re.sub(r'[，,、。！？!?；~～><]+$', '', task)
 
-    # extract subject
-    subject_match = re.search(r'＠[^ ，]+', text)  # Match text starting with "＠" and ending before space/comma
-    if subject_match:
-        subject = subject_match.group(0)
-    else:
-        # If no subject is found or subject is "我", use default subject
-        subject = default_subject
 
     if time_end_idx > 0:
-        return subject, tt, task 
+        return subject, time_expression, task, rep
     else:
-        return None, None, None
+        return None, None, None, rep
 
-@app.route('/process', methods=['POST'])
-def nlp_service():
-    data = request.json
-    string = data.get('string', '')
-    zone = data.get('zone', 'Asia/Taipei')
-    default_subject = data.get('default_subject', '')
-    subj, cron_expression, task = parse_text(string, zone, default_subject)
-    if cron_expression == ' ':
-        return jsonify({'error': 'No time expression found'})
-    return jsonify({'subject': subj, 'time_expressions': cron_expression, 'task': task})
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+
+#test_strings = '提醒 ＠多芣朗炫34打擊砲 明天下午 4點 幫貓洗澡。'
+#test_strings = '我 這禮拜天早上十點三十五分 跟朋友有約 ~'
+#test_strings = '我這星期一半夜兩點半 要睡覺 ~'
+#test_strings = '提醒我 每週五 3:15am 幫hona洗澡。'
+#test_strings = '提醒我 6/22 3:15pm 打掃。'
+#test_strings = '提醒我 40分鐘後 關瓦斯'
+#test_strings = '提醒我 二十小時後 撿五個垃圾'
+#test_strings = '提醒我 二十天後 收包裹'
+#test_strings = '提醒我 每週二 4PM 運動'
+
+
+
+
+# subject, time, task, rep = parse_text(test_strings)
+# print(f"{test_strings} -> {subject} {time} {task}")
