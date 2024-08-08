@@ -2,6 +2,10 @@
 
 This project is a Linebot application that leverages Natural Language Processing (NLP) to provide reminder service through chat based on users' requests. The bot is designed to understand and process Mandarin time-related queries, offering a more humanized reminder for users on the LINE messaging platform.
 
+## Features Demo Video
+
+The features demo video is provided [here](https://drive.google.com/file/d/1gx6wD-fwdyGCF9k_6ESadKVNU_GXFv2F/view?usp=drive_link).
+
 ## Features
 
 - **Natural Language Understanding**: The bot can comprehend and respond to a variety of user time-reminding requests using advanced NLP techniques.
